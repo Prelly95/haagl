@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Icon Creator — LCD bitmap editor</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <header>
+    <h1>ICON<span class="px">▚</span>EDITOR</h1>
+    <span class="sub">figma icon → monochrome LCD bitmap → C header</span>
+  </header>
+
+  <div class="app">
+    <!-- ============ editor ============ -->
+    <div class="stage">
+      <div class="toolbar">
+        <button data-op="rotccw" title="Rotate 90° counter-clockwise">⟲ rot</button>
+        <button data-op="rotcw" title="Rotate 90° clockwise">rot ⟳</button>
+        <div class="sep"></div>
+        <button data-op="fliph" title="Flip horizontal">⇋ flip H</button>
+        <button data-op="flipv" title="Flip vertical">⇵ flip V</button>
+        <div class="sep"></div>
+        <button data-op="shl" title="Shift left (wraps)">◂</button>
+        <button data-op="shu" title="Shift up (wraps)">▴</button>
+        <button data-op="shd" title="Shift down (wraps)">▾</button>
+        <button data-op="shr" title="Shift right (wraps)">▸</button>
+        <div class="sep"></div>
+        <button data-op="invert" title="Invert all pixels">invert</button>
+        <button data-op="clear" title="Clear canvas">clear</button>
+        <button data-op="undo" title="Undo (Ctrl+Z)">undo</button>
+      </div>
+
+      <div class="bezel">
+        <div class="screen"><canvas id="editor"></canvas></div>
+      </div>
+
+      <div class="iconbar">
+        <button id="icPrev" title="Previous icon">◂</button>
+        <span class="lbl" id="icLabel"><b>icon</b> · 1/1</span>
+        <button id="icNext" title="Next icon">▸</button>
+        <span class="gap"></span>
+        <button id="icAdd" title="Add a new blank icon">+ new</button>
+        <button id="icDup" title="Duplicate current icon">duplicate</button>
+        <button id="icDel" title="Delete current icon">delete</button>
+      </div>
+
+      <div class="status">
+        <span>size <b id="stSize">8×8</b></span>
+        <span>set <b id="stOn">0</b> px</span>
+        <span>payload <b id="stBytes">8</b> B</span>
+        <span id="stPos"></span>
+      </div>
+    </div>
+
+    <div id="divider" title="Drag to resize panel"></div>
+
+    <!-- ============ controls ============ -->
+    <div class="side">
+      <div class="side-head">
+        <button class="iconbtn" id="btnSidebar" title="Close sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <line x1="15" y1="4" x2="15" y2="20" />
+          </svg>
+        </button>
+      </div>
+      <div class="side-body">
+        <div class="group">
+          <h2>Import image</h2>
+          <div class="drop" id="drop">drop an image here, click to browse,<br>or paste from clipboard (Ctrl+V)</div>
+          <input type="file" id="file" accept="image/*" hidden>
+          <div class="row" style="margin-top:10px">
+            <label for="thr">threshold</label>
+            <input id="thr" type="range" min="0" max="255" value="128">
+            <span class="val" id="thrVal">128</span>
+          </div>
+          <div class="row">
+            <label for="fit">scaling</label>
+            <select id="fit">
+              <option value="contain">fit (keep aspect)</option>
+              <option value="cover">fill (crop)</option>
+              <option value="stretch">stretch</option>
+            </select>
+          </div>
+          <div class="row">
+            <label class="chk"><input type="checkbox" id="imgInv"> invert</label>
+            <label class="chk"><input type="checkbox" id="dith"> dither (Floyd–Steinberg)</label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h2>Output</h2>
+          <div class="row">
+            <label for="name">array name</label>
+            <input id="name" type="text" value="icon" spellcheck="false">
+          </div>
+          <div class="row">
+            <label for="pack">packing</label>
+            <select id="pack">
+              <option value="h">horizontal — row major, 1bpp</option>
+              <option value="v">vertical — 8px pages (SSD1306)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="bitorder">bit order</label>
+            <select id="bitorder">
+              <option value="msb">MSB first (bit7 = left / bottom)</option>
+              <option value="lsb">LSB first (bit0 = left / top)</option>
+            </select>
+          </div>
+        </div>
+      </div><!-- /side-body -->
+    </div>
+  </div>
+
+  <!-- ============ code panel (bottom) ============ -->
+  <div class="codepanel" id="codepanel">
+    <div id="hdivider" title="Drag to resize code panel"></div>
+    <div class="bar">
+      <button class="btn primary" id="btnCopy">copy header</button>
+      <button class="btn" id="btnDl">download .h</button>
+      <span class="hint" id="codeHint"></span>
+      <span class="err" id="parseErr"></span>
+    </div>
+    <div class="codebox" id="codebox">
+      <pre id="hl" aria-hidden="true"></pre>
+      <textarea id="code" spellcheck="false" autocomplete="off" wrap="off"
+        aria-label="C header source — editable, Ctrl+S applies"></textarea>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">copied</div>
+
+  <!-- classic scripts (shared global scope) so the app runs straight off file:// -->
+  <script src="js/state.js"></script>
+  <script src="js/canvas.js"></script>
+  <script src="js/transforms.js"></script>
+  <script src="js/import.js"></script>
+  <script src="js/codegen.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/panels.js"></script>
+  <script src="js/main.js"></script>
+</body>
+
+</html>
