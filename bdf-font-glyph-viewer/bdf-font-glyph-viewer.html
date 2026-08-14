@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BDF Glyph Viewer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --bg: #0e1113;
+  --panel: #161b1d;
+  --panel2: #1c2224;
+  --line: #272f31;
+  --ink: #d6dcd3;
+  --muted: #7e8880;
+  --accent: #e0a24a;
+  --accent-ink: #1a1206;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+
+html, body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+header h1 { font-size: 15px; font-weight: 700; letter-spacing: .06em; }
+header h1 .px { color: var(--accent); }
+header .sub { color: var(--muted); font-size: 11px; }
+
+.app {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.info {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.side {
+  width: 220px;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex: none;
+}
+
+.group {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.group h2 {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.control-row:last-child { margin-bottom: 0; }
+
+.control-row label {
+  color: var(--muted);
+  font-size: 11px;
+  min-width: 90px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stepper button {
+  background: var(--panel2);
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-family: var(--mono);
+  width: 24px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.stepper button:hover {
+  background: var(--line);
+  color: var(--accent);
+}
+
+.stepper button:active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.stepper input[type=number] {
+  width: 40px;
+  background: var(--bg);
+  border: none;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  padding: 5px 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: center;
+  height: 28px;
+  -moz-appearance: textfield;
+}
+
+.stepper input[type=number]::-webkit-inner-spin-button,
+.stepper input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepper input[type=number]:focus {
+  outline: none;
+  background: #0e1518;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.legend-swatch { width: 16px; height: 3px; border-radius: 1px; }
+
+.bottom {
+  display: flex;
+  min-height: 100px;
+  height: 170px;
+  border-top: 1px solid var(--line);
+  flex: none;
+  position: relative;
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: row-resize;
+  background: var(--line);
+  transition: background .15s;
+}
+
+.resize-handle:hover, .resize-handle.dragging {
+  background: var(--accent);
+}
+
+.input-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+}
+
+.input-pane + .input-pane { border-left: 1px solid var(--line); }
+
+.input-pane h2 {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+textarea {
+  flex: 1;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  resize: none;
+  line-height: 1.4;
+}
+
+textarea:focus { outline: none; border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>BDF<span class="px">▚</span>VIEWER</h1>
+  <span class="sub">paste glyph data — visualise font metrics</span>
+</header>
+
+<div class="app">
+  <div class="stage">
+    <canvas id="canvas"></canvas>
+    <div class="info" id="info"></div>
+  </div>
+
+  <div class="side">
+    <div class="group">
+      <h2>Metrics</h2>
+      <div class="control-row"><label>FONT_ASCENT</label><div class="stepper"><button data-target="metricAscent" data-dir="-1">−</button><input type="number" id="metricAscent" value="6"><button data-target="metricAscent" data-dir="1">+</button></div></div>
+      <div class="control-row"><label>FONT_DESCENT</label><div class="stepper"><button data-target="metricDescent" data-dir="-1">−</button><input type="number" id="metricDescent" value="1"><button data-target="metricDescent" data-dir="1">+</button></div></div>
+      <div class="control-row"><label>CAP_HEIGHT</label><div class="stepper"><button data-target="metricCapHeight" data-dir="-1">−</button><input type="number" id="metricCapHeight" value="6"><button data-target="metricCapHeight" data-dir="1">+</button></div></div>
+      <div class="control-row"><label>X_HEIGHT</label><div class="stepper"><button data-target="metricXHeight" data-dir="-1">−</button><input type="number" id="metricXHeight" value="4"><button data-target="metricXHeight" data-dir="1">+</button></div></div>
+    </div>
+    <div class="group">
+      <h2>Legend</h2>
+      <div class="legend-item"><span class="legend-swatch" style="background:#ff4444;"></span> Ascent</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#44aaff;"></span> Cap Height</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#aa66ff;"></span> X Height</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#44ff44;"></span> Baseline</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#ffaa00;"></span> Descent</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#666;"></span> BBX bounds</div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom" id="bottomPanel">
+  <div class="resize-handle" id="resizeHandle"></div>
+  <div class="input-pane">
+    <h2>Font Properties</h2>
+    <textarea id="propsInput" placeholder="Paste STARTFONT ... ENDPROPERTIES">STARTFONT 2.1
+FONT -Misc-DroneShield-Medium-R-Normal--7-70-75-75-C-50-ISO10646-1
+SIZE 7 75 75
+FONTBOUNDINGBOX 5 7 0 0
+STARTPROPERTIES 23
+PIXEL_SIZE 7
+FONT_ASCENT 6
+FONT_DESCENT 1
+CAP_HEIGHT 6
+X_HEIGHT 4
+ENDPROPERTIES</textarea>
+  </div>
+  <div class="input-pane">
+    <h2>Glyph Data</h2>
+    <textarea id="glyphInput" placeholder="Paste STARTCHAR ... ENDCHAR">STARTCHAR A
+ENCODING 65
+SWIDTH 685 0
+DWIDTH 5 0
+BBX 5 7 0 -1
+BITMAP
+20
+50
+88
+88
+F8
+88
+88
+ENDCHAR</textarea>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function parseProps(text) {
+  const props = {};
+  for (const line of text.split('\n')) {
+    const m = line.match(/^(FONT_ASCENT|FONT_DESCENT|CAP_HEIGHT|X_HEIGHT|PIXEL_SIZE)\s+(\d+)/);
+    if (m) props[m[1]] = parseInt(m[2]);
+    const bbx = line.match(/^FONTBOUNDINGBOX\s+(\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)/);
+    if (bbx) {
+      props.FBBX_W = parseInt(bbx[1]);
+      props.FBBX_H = parseInt(bbx[2]);
+      props.FBBX_X = parseInt(bbx[3]);
+      props.FBBX_Y = parseInt(bbx[4]);
+    }
+  }
+  return props;
+}
+
+function parseGlyph(text) {
+  const glyph = { name: '', encoding: 0, width: 5, height: 7, xoff: 0, yoff: 0, bitmap: [] };
+  let inBitmap = false;
+
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (t.startsWith('STARTCHAR')) glyph.name = t.split(/\s+/)[1] || '';
+    else if (t.startsWith('ENCODING')) glyph.encoding = parseInt(t.split(/\s+/)[1]);
+    else if (t.startsWith('BBX')) {
+      const p = t.split(/\s+/);
+      glyph.width = parseInt(p[1]);
+      glyph.height = parseInt(p[2]);
+      glyph.xoff = parseInt(p[3]);
+      glyph.yoff = parseInt(p[4]);
+    }
+    else if (t === 'BITMAP') inBitmap = true;
+    else if (t === 'ENDCHAR') inBitmap = false;
+    else if (inBitmap && t.length > 0) {
+      const val = parseInt(t, 16);
+      const bits = [];
+      for (let i = 7; i >= 0; i--) bits.push((val >> i) & 1);
+      glyph.bitmap.push(bits);
+    }
+  }
+  return glyph;
+}
+
+function draw() {
+  const props = parseProps(document.getElementById('propsInput').value);
+  const glyph = parseGlyph(document.getElementById('glyphInput').value);
+
+  const fontAscent = parseInt(document.getElementById('metricAscent').value) || props.FONT_ASCENT || 6;
+  const fontDescent = parseInt(document.getElementById('metricDescent').value) || props.FONT_DESCENT || 1;
+  const capHeight = parseInt(document.getElementById('metricCapHeight').value) || props.CAP_HEIGHT || 6;
+  const xHeight = parseInt(document.getElementById('metricXHeight').value) || props.X_HEIGHT || 4;
+
+  const cellHeight = fontAscent + fontDescent;
+  const cellWidth = glyph.width;
+
+  const topExtent = Math.max(fontAscent, capHeight, xHeight);
+  const visibleHeight = topExtent + fontDescent;
+
+  const padCols = 3;
+  const padRows = 2;
+  const labelCols = 5;
+  const gridW = cellWidth + padCols * 2 + labelCols;
+  const gridH = visibleHeight + padRows * 2;
+
+  const stage = document.querySelector('.stage');
+  const stageW = stage.clientWidth;
+  const stageH = stage.clientHeight;
+
+  const px = Math.floor(Math.min((stageW - 40) / gridW, (stageH - 40) / gridH));
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = stageW * dpr;
+  canvas.height = stageH * dpr;
+  canvas.style.width = stageW + 'px';
+  canvas.style.height = stageH + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  ctx.clearRect(0, 0, stageW, stageH);
+
+  // Center the glyph cell itself in the stage
+  const glyphCenterX = Math.floor(stageW / 2);
+  const glyphCenterY = Math.floor(stageH / 2);
+  const offsetX = glyphCenterX - Math.floor((cellWidth * px) / 2) - padCols * px;
+  const offsetY = glyphCenterY - Math.floor((visibleHeight * px) / 2) - padRows * px;
+
+  const originX = offsetX + padCols * px;
+  const baselineRow = topExtent;
+  const originY = offsetY + padRows * px;
+
+  // Cell background (the actual font cell: ascent + descent)
+  const cellTopRow = baselineRow - fontAscent;
+  ctx.fillStyle = '#141414';
+  ctx.fillRect(originX, originY + cellTopRow * px, cellWidth * px, cellHeight * px);
+
+  // Grid lines for the cell
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = 0.5;
+  for (let r = 0; r <= cellHeight; r++) {
+    ctx.beginPath();
+    ctx.moveTo(originX, originY + (cellTopRow + r) * px);
+    ctx.lineTo(originX + cellWidth * px, originY + (cellTopRow + r) * px);
+    ctx.stroke();
+  }
+  for (let c = 0; c <= cellWidth; c++) {
+    ctx.beginPath();
+    ctx.moveTo(originX + c * px, originY + cellTopRow * px);
+    ctx.lineTo(originX + c * px, originY + (cellTopRow + cellHeight) * px);
+    ctx.stroke();
+  }
+
+  // Glyph pixels
+  const glyphTopRow = baselineRow - (glyph.yoff + glyph.height);
+  for (let r = 0; r < glyph.bitmap.length; r++) {
+    for (let c = 0; c < glyph.width; c++) {
+      if (glyph.bitmap[r][c]) {
+        const cellRow = glyphTopRow + r;
+        const cellCol = glyph.xoff + c;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(originX + cellCol * px + 1, originY + cellRow * px + 1, px - 2, px - 2);
+      }
+    }
+  }
+
+  // Metric lines
+  const lineLeft = originX - padCols * px + 4;
+  const lineRight = originX + cellWidth * px + padCols * px - 4;
+  const labelX = lineRight + 6;
+  const fontSize = Math.max(9, Math.min(13, px * 0.6));
+
+  const metrics = [
+    { row: cellTopRow, color: '#ff4444', label: 'Ascent' },
+    { row: baselineRow - capHeight, color: '#44aaff', label: 'Cap' },
+    { row: baselineRow - xHeight, color: '#aa66ff', label: 'x-Ht' },
+    { row: baselineRow, color: '#44ff44', label: 'Baseline' },
+    { row: cellTopRow + cellHeight, color: '#ffaa00', label: 'Descent' },
+  ];
+
+  // Offset labels that share the same row
+  const labelOffsets = {};
+  for (const m of metrics) {
+    const key = m.row;
+    if (labelOffsets[key] === undefined) labelOffsets[key] = 0;
+    m.labelOffset = labelOffsets[key];
+    labelOffsets[key] += fontSize + 2;
+  }
+
+  for (const m of metrics) {
+    const y = originY + m.row * px;
+    ctx.strokeStyle = m.color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(lineLeft, y);
+    ctx.lineTo(lineRight, y);
+    ctx.stroke();
+
+    ctx.fillStyle = m.color;
+    ctx.font = fontSize + 'px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText(m.label, labelX, y + fontSize * 0.35 + m.labelOffset);
+  }
+
+  // BBX dashed outline
+  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  const bbxTop = originY + glyphTopRow * px;
+  const bbxBot = originY + (glyphTopRow + glyph.height) * px;
+  const bbxLeft = originX + glyph.xoff * px;
+  const bbxRight = originX + (glyph.xoff + glyph.width) * px;
+  ctx.strokeRect(bbxLeft, bbxTop, bbxRight - bbxLeft, bbxBot - bbxTop);
+  ctx.setLineDash([]);
+
+  document.getElementById('info').textContent =
+    `Cell: ${cellWidth}×${cellHeight}px | Glyph: ${glyph.name} (U+${glyph.encoding.toString(16).toUpperCase().padStart(4,'0')}) | BBX: ${glyph.width}×${glyph.height} off(${glyph.xoff},${glyph.yoff}) | Line spacing: ${cellHeight}px`;
+}
+
+document.getElementById('propsInput').addEventListener('input', () => {
+  const props = parseProps(document.getElementById('propsInput').value);
+  if (props.FONT_ASCENT !== undefined) document.getElementById('metricAscent').value = props.FONT_ASCENT;
+  if (props.FONT_DESCENT !== undefined) document.getElementById('metricDescent').value = props.FONT_DESCENT;
+  if (props.CAP_HEIGHT !== undefined) document.getElementById('metricCapHeight').value = props.CAP_HEIGHT;
+  if (props.X_HEIGHT !== undefined) document.getElementById('metricXHeight').value = props.X_HEIGHT;
+  draw();
+});
+
+document.getElementById('glyphInput').addEventListener('input', draw);
+document.getElementById('metricAscent').addEventListener('input', draw);
+document.getElementById('metricDescent').addEventListener('input', draw);
+document.getElementById('metricCapHeight').addEventListener('input', draw);
+document.getElementById('metricXHeight').addEventListener('input', draw);
+window.addEventListener('resize', draw);
+
+// Stepper buttons
+document.querySelectorAll('.stepper button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.target);
+    const dir = parseInt(btn.dataset.dir);
+    input.value = Math.max(0, parseInt(input.value || 0) + dir);
+    draw();
+  });
+});
+
+// Resize handle for bottom panel
+const bottomPanel = document.getElementById('bottomPanel');
+const resizeHandle = document.getElementById('resizeHandle');
+let dragging = false;
+let startY = 0;
+let startH = 0;
+
+resizeHandle.addEventListener('mousedown', (e) => {
+  dragging = true;
+  startY = e.clientY;
+  startH = bottomPanel.offsetHeight;
+  resizeHandle.classList.add('dragging');
+  document.body.style.cursor = 'row-resize';
+  e.preventDefault();
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const delta = startY - e.clientY;
+  const newH = Math.max(80, Math.min(window.innerHeight * 0.6, startH + delta));
+  bottomPanel.style.height = newH + 'px';
+  draw();
+});
+
+window.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  dragging = false;
+  resizeHandle.classList.remove('dragging');
+  document.body.style.cursor = '';
+});
+
+draw();
+</script>
+</body>
+</html>
