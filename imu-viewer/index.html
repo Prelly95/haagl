@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMU Viewer</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <h1>IMU<span class="accent">▚</span>VIEWER</h1>
+  <span class="sub">real-time orientation · accel · gyro</span>
+  <button class="btn" id="btnPersp">persp</button>
+  <button class="btn" id="btnConnect">connect</button>
+</header>
+
+<main>
+  <div class="viewport">
+    <canvas id="imuCanvas" aria-label="3D IMU orientation — drag grid to orbit"></canvas>
+
+    <!-- shown when no WebSocket is connected -->
+    <div class="no-signal" id="noSignal" aria-live="polite">
+      <div class="ns-box">
+        <div class="ns-icon">⬡</div>
+        <div class="ns-title">no signal</div>
+        <div class="ns-msg">
+          No WebSocket source found at <code>ws://localhost:8765</code>.
+        </div>
+        <button class="btn primary" id="btnNoSignalConnect" style="margin-top:var(--sp-4);width:100%">connect</button>
+      </div>
+    </div>
+
+    <aside class="readout" aria-label="Numeric readout">
+      <div class="readout-section">
+        <h2>Accel (m/s²)</h2>
+        <div class="readout-row"><span class="label">X</span><span class="val x" id="rAx"> 0.000</span></div>
+        <div class="readout-row"><span class="label">Y</span><span class="val y" id="rAy"> 0.000</span></div>
+        <div class="readout-row"><span class="label">Z</span><span class="val z" id="rAz"> 0.000</span></div>
+      </div>
+      <div class="readout-section">
+        <h2>Gyro (deg/s)</h2>
+        <div class="readout-row"><span class="label">X</span><span class="val x" id="rGx"> 0.000</span></div>
+        <div class="readout-row"><span class="label">Y</span><span class="val y" id="rGy"> 0.000</span></div>
+        <div class="readout-row"><span class="label">Z</span><span class="val z" id="rGz"> 0.000</span></div>
+      </div>
+      <div class="readout-section">
+        <h2>Euler (deg)</h2>
+        <div class="readout-row"><span class="label">Roll</span> <span class="val x" id="rRoll"> 0.0</span></div>
+        <div class="readout-row"><span class="label">Pitch</span><span class="val y" id="rPitch"> 0.0</span></div>
+        <div class="readout-row"><span class="label">Yaw</span>  <span class="val z" id="rYaw"> 0.0</span></div>
+      </div>
+      <div class="conn-indicator">
+        <div class="conn-dot" id="connDot"></div>
+        <span id="connLabel">not connected</span>
+      </div>
+    </aside>
+  </div>
+
+  <div class="graphs">
+    <div class="graph-row">
+      <div class="graph-label">
+        <span class="gname">Accel</span>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--ax-x)"></div><span>X</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--ax-y)"></div><span>Y</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--ax-z)"></div><span>Z</span></div>
+      </div>
+      <div class="graph-canvas-wrap">
+        <canvas id="accelGraph" aria-label="Accelerometer graph"></canvas>
+      </div>
+    </div>
+    <div class="graph-row">
+      <div class="graph-label">
+        <span class="gname">Gyro</span>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--ax-x)"></div><span>X</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--ax-y)"></div><span>Y</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--ax-z)"></div><span>Z</span></div>
+      </div>
+      <div class="graph-canvas-wrap">
+        <canvas id="gyroGraph" aria-label="Gyroscope graph"></canvas>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>imu-viewer</span>
+  <span id="statusMsg">not connected</span>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- connect modal -->
+<div class="modal-overlay" id="connModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle">WebSocket connection</h2>
+    <p>Enter the WebSocket URL of an IMU data source. The source must emit JSON frames with <code style="display:inline;padding:1px 5px;margin:0">ax ay az gx gy gz</code> fields.</p>
+    <div class="row" style="margin-bottom: var(--sp-4);">
+      <div class="field-inline">
+        <label for="wsUrl">WS URL</label>
+        <input id="wsUrl" type="text" value="ws://localhost:8765" spellcheck="false">
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="btnDoConnect">connect</button>
+      <button class="btn" id="btnModalClose">cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- load order: state → rendering → ui -->
+<script src="js/imu.js"></script>
+<script src="js/ws.js"></script>
+<script src="js/viewport.js"></script>
+<script src="js/graphs.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

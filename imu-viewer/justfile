@@ -1,0 +1,40 @@
+# imu-viewer — task runner
+# Requires: just (https://github.com/casey/just)
+
+viewer_dir  := justfile_directory()
+server_dir  := viewer_dir / "imu_server"
+index       := viewer_dir / "index.html"
+
+# Show available recipes
+default:
+    @just --list
+
+# Open the viewer in the default browser
+open:
+    xdg-open {{index}} 2>/dev/null || open {{index}}
+
+# Start the mock IMU server
+mock:
+    cd {{server_dir}} && uv run server.py
+
+# Start the mock server at a custom rate (Hz)
+mock-rate rate:
+    cd {{server_dir}} && uv run server.py --rate {{rate}}
+
+# Start the server with a real serial IMU
+serial port="/dev/ttyUSB0" baud="115200":
+    cd {{server_dir}} && uv run server.py --source serial --port {{port}} --baud {{baud}}
+
+# Install server dependencies
+install:
+    cd {{server_dir}} && uv sync
+
+# Install server + serial support
+install-serial:
+    cd {{server_dir}} && uv sync --extra serial
+
+# Open viewer and start mock server together (two terminals required — use a multiplexer)
+dev:
+    @echo "Run these in separate terminals:"
+    @echo "  just mock"
+    @echo "  just open"
